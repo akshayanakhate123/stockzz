@@ -10,6 +10,7 @@ import {
   Check,
   ChevronRight,
   Circle,
+  CircleHelp,
   Clock,
   Flag,
   Gauge,
@@ -24,6 +25,7 @@ import {
   Moon,
   Newspaper,
   Pause,
+  Plus,
   Play,
   RefreshCw,
   ShieldCheck,
@@ -85,6 +87,8 @@ const ICONS = {
   skip: SkipForward,
   landmark: Landmark,
   drag: MoveVertical,
+  help: CircleHelp,
+  plus: Plus,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

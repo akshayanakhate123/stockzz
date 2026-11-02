@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CATEGORIES, LESSON, LESSON_STEPS, LESSONS, nextLesson } from "@/content/lessons";
 import { getRound } from "@/content/rounds";
+import { FAQS } from "@/content/faqs";
 import { missingFor, STEP } from "@/content/path";
 import { actions, useApp } from "@/lib/store";
 import type { AppState, Lesson, Visual } from "@/lib/types";
@@ -20,6 +21,9 @@ export function LessonPlayer({ slug }: { slug: string }) {
   const { state, hydrated } = useApp();
   const progress = state.lessons[slug];
   const [step, setStep] = useState(0);
+  const [faqOpen, setFaqOpen] = useState(false);
+  const closeFaq = useCallback(() => setFaqOpen(false), []);
+  const faqCount = FAQS[slug]?.length ?? 0;
 
   useEffect(() => {
     if (!hydrated) return;
@@ -60,7 +64,7 @@ export function LessonPlayer({ slug }: { slug: string }) {
 
   return (
     <div className="grid gap-8 lg:grid-cols-[248px_minmax(0,1fr)] 2xl:grid-cols-[264px_minmax(0,1fr)_300px]">
-      <LessonOutline lesson={lesson} step={step} pct={pctDone} canOpen={canOpen} onPick={go} />
+      <LessonOutline lesson={lesson} step={step} pct={pctDone} canOpen={canOpen} onPick={go} faqCount={faqCount} onFaq={() => setFaqOpen(true)} />
       <div className="min-w-0">
         <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted">
           <Link href="/learn" className="hover:text-brand">
@@ -77,6 +81,15 @@ export function LessonPlayer({ slug }: { slug: string }) {
             <Badge tone="up">
               <Icon name="check" size={12} /> Completed
             </Badge>
+          )}
+          {faqCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setFaqOpen(true)}
+              className="inline-flex items-center gap-1 rounded-full border border-brand/40 px-2.5 py-0.5 text-xs font-bold text-brand transition hover:bg-brand-soft"
+            >
+              <Icon name="help" size={12} /> {faqCount} FAQs
+            </button>
           )}
         </div>
         <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{lesson.title}</h1>
@@ -169,6 +182,148 @@ export function LessonPlayer({ slug }: { slug: string }) {
         </div>
       </div>
       <LessonRail lesson={lesson} state={state} />
+
+      {faqCount > 0 && (
+        <>
+          <button
+            type="button"
+            onClick={() => setFaqOpen(true)}
+            aria-haspopup="dialog"
+            className={cx(
+              "animate-toast fixed right-4 bottom-20 z-40 inline-flex items-center gap-2 rounded-full bg-brand py-2.5 pr-2.5 pl-4 text-sm font-bold text-on-brand shadow-lg transition hover:-translate-y-0.5 hover:bg-brand-strong md:right-6 md:bottom-6 lg:hidden",
+              faqOpen && "pointer-events-none opacity-0",
+            )}
+          >
+            <Icon name="help" size={17} /> Lesson FAQ
+            <span className="num grid size-6 place-items-center rounded-full bg-black/15 text-xs">{faqCount}</span>
+          </button>
+          <FaqDrawer slug={slug} open={faqOpen} onClose={closeFaq} onReview={() => go(STEP.example)} />
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Common questions about this lesson, answered from its own content, in a panel that slides in from the right. */
+function FaqDrawer({ slug, open, onClose, onReview }: { slug: string; open: boolean; onClose: () => void; onReview: () => void }) {
+  const faqs = FAQS[slug] ?? [];
+  const [expanded, setExpanded] = useState<number | null>(0);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    closeRef.current?.focus({ preventScroll: true });
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [open, onClose]);
+
+  return (
+    <div className={cx("fixed inset-0 z-[65]", !open && "pointer-events-none")} aria-hidden={!open} inert={!open}>
+      <div onClick={onClose} className={cx("absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300", open ? "opacity-100" : "opacity-0")} />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="faq-title"
+        className={cx(
+          "absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-line bg-card shadow-2xl transition-transform duration-300 ease-out",
+          open ? "translate-x-0" : "translate-x-full",
+        )}
+      >
+        <div className="hero-glow flex items-start gap-4 border-b border-line p-5">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-brand text-on-brand">
+            <Icon name="help" size={22} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand">Lesson FAQ</p>
+            <h2 id="faq-title" className="mt-0.5 text-lg font-extrabold leading-tight">
+              Questions learners ask
+            </h2>
+            <p className="mt-1 text-xs text-muted">{faqs.length} quick answers, all drawn from this lesson.</p>
+          </div>
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={onClose}
+            aria-label="Close FAQ"
+            className="grid size-9 shrink-0 place-items-center rounded-full border border-line-strong text-muted transition hover:border-brand hover:text-brand"
+          >
+            <Icon name="x" size={16} />
+          </button>
+        </div>
+
+        <ul className="min-h-0 flex-1 divide-y divide-line overflow-y-auto overscroll-contain">
+          {faqs.map((f, i) => {
+            const isOpen = expanded === i;
+            const id = `faq-${slug}-${i}`;
+            return (
+              <li key={f.q} className={cx("relative transition-colors duration-300", isOpen && "bg-brand-soft/40")}>
+                <span
+                  aria-hidden="true"
+                  className={cx("absolute inset-y-0 left-0 w-1 origin-top bg-brand transition-transform duration-300", isOpen ? "scale-y-100" : "scale-y-0")}
+                />
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  aria-controls={id}
+                  onClick={() => setExpanded(isOpen ? null : i)}
+                  className="group flex w-full items-start gap-3 px-5 py-4 text-left"
+                >
+                  <span
+                    className={cx(
+                      "num mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg text-xs font-extrabold transition-colors",
+                      isOpen ? "bg-brand text-on-brand" : "bg-surface-2 text-muted group-hover:text-brand",
+                    )}
+                  >
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className={cx("flex-1 pt-0.5 text-sm font-bold leading-snug transition-colors", !isOpen && "group-hover:text-brand")}>{f.q}</span>
+                  <span
+                    className={cx(
+                      "grid size-7 shrink-0 place-items-center rounded-full border transition duration-300",
+                      isOpen ? "rotate-45 border-brand bg-brand text-on-brand" : "border-line-strong text-muted group-hover:border-brand group-hover:text-brand",
+                    )}
+                  >
+                    <Icon name="plus" size={15} strokeWidth={2.4} />
+                  </span>
+                </button>
+                {/* Animates to the answer's natural height. */}
+                <div
+                  id={id}
+                  role="region"
+                  aria-hidden={!isOpen}
+                  inert={!isOpen}
+                  className={cx("grid transition-[grid-template-rows] duration-300 ease-out", isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}
+                >
+                  <div className="overflow-hidden">
+                    <p className={cx("pr-5 pb-5 pl-15 text-sm leading-relaxed text-muted transition-opacity duration-300", isOpen ? "opacity-100" : "opacity-0")}>
+                      {f.a}
+                    </p>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="border-t border-line p-4">
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+              onClose();
+              onReview();
+            }}
+          >
+            <Icon name="book" size={15} /> Review the worked example
+          </Button>
+        </div>
+      </aside>
     </div>
   );
 }
@@ -180,12 +335,16 @@ function LessonOutline({
   pct,
   canOpen,
   onPick,
+  faqCount,
+  onFaq,
 }: {
   lesson: Lesson;
   step: number;
   pct: number;
   canOpen: (i: number) => boolean;
   onPick: (i: number) => void;
+  faqCount: number;
+  onFaq: () => void;
 }) {
   const index = LESSONS.indexOf(lesson);
   const next = nextLesson(lesson.slug);
@@ -239,6 +398,23 @@ function LessonOutline({
             {next ? next.title : "The simulation"} <Icon name="arrowRight" size={15} className="shrink-0 text-brand" />
           </span>
         </Link>
+        {faqCount > 0 && (
+          <button
+            type="button"
+            onClick={onFaq}
+            aria-haspopup="dialog"
+            className="lift group flex w-full items-center gap-3 rounded-2xl border border-brand/40 bg-brand-soft/50 p-4 text-left"
+          >
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand text-on-brand">
+              <Icon name="help" size={18} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-bold group-hover:text-brand">Got a question?</span>
+              <span className="block text-xs text-muted">{faqCount} answers about this lesson</span>
+            </span>
+            <Icon name="arrowRight" size={15} className="shrink-0 text-brand" />
+          </button>
+        )}
         <Link href="/learn" className="flex items-center gap-2 px-1 text-sm font-semibold text-muted hover:text-brand">
           <Icon name="arrowLeft" size={14} /> All lessons
         </Link>
@@ -302,15 +478,18 @@ function IntroStep({ lesson }: { lesson: Lesson }) {
           <p key={p}>{p}</p>
         ))}
       </div>
-      <h3 className="mt-8 mb-3 text-xs font-bold uppercase tracking-wider text-muted">Key terms</h3>
-      <dl className="grid gap-3 sm:grid-cols-3">
-        {lesson.terms.map((t) => (
-          <div key={t.term} className="rounded-xl border border-line bg-surface p-4">
-            <dt className="font-bold text-brand">{t.term}</dt>
-            <dd className="mt-1 text-sm text-muted">{t.def}</dd>
-          </div>
-        ))}
-      </dl>
+      {/* On very wide screens the key terms live in the right rail instead. */}
+      <div className="2xl:hidden">
+        <h3 className="mt-8 mb-3 text-xs font-bold uppercase tracking-wider text-muted">Key terms</h3>
+        <dl className="grid gap-3 sm:grid-cols-3">
+          {lesson.terms.map((t) => (
+            <div key={t.term} className="rounded-xl border border-line bg-surface p-4">
+              <dt className="font-bold text-brand">{t.term}</dt>
+              <dd className="mt-1 text-sm text-muted">{t.def}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
     </div>
   );
 }
