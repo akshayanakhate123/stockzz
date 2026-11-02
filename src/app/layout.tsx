@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { Footer, Header, MobileNav } from "@/components/shell";
 import { themeScript } from "@/components/theme";
+import { BadgeToaster } from "@/components/badge-toast";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", display: "swap" });
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </main>
         <Footer />
         <MobileNav />
+        <BadgeToaster />
       </body>
     </html>
   );

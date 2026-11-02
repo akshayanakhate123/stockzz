@@ -13,18 +13,32 @@ import { charge, maxAffordable, previewOrders } from "@/lib/engine";
 import { cx, pct, rupees, share, toneOf } from "@/lib/format";
 import { portfolioValue } from "@/lib/portfolio";
 import { actions, useApp } from "@/lib/store";
-import type { Ledger, Order, Round, SimState, Side, Ticker } from "@/lib/types";
+import type { Ledger, Order, Prediction, Round, SimState, Side, Ticker } from "@/lib/types";
 import { ValueChart } from "@/components/charts";
 import { Icon } from "@/components/icons";
 import { HoldingsTable, PortfolioStrip, ProfileLimits, RoundProgress, SectorBars } from "@/components/sim-ui";
 import { Badge, Button, Card, Skeleton } from "@/components/ui";
 import { Debrief } from "../review/[round]/debrief";
 import { AnimatedNumber } from "@/components/motion";
+import { PredictChart } from "@/components/predict";
+import { MarketReplay } from "@/components/replay";
+import { RoundIntro } from "@/components/round-intro";
 
 export default function PlayPage() {
   const { state, hydrated } = useApp();
   const router = useRouter();
   const sim = state.sim;
+  // The round just confirmed in this visit plays out as a replay before its debrief.
+  const [replaying, setReplaying] = useState<number | null>(null);
+  // Moving on from a debrief shows a short title card for the new round (not on a reload).
+  const [intro, setIntro] = useState<number | null>(null);
+  const lastRound = useRef<number | null>(null);
+  const current = sim?.currentRound;
+  useEffect(() => {
+    if (current === undefined) return;
+    if (lastRound.current !== null && current > lastRound.current) setIntro(current);
+    lastRound.current = current;
+  }, [current]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -34,8 +48,15 @@ export default function PlayPage() {
 
   if (!hydrated || !sim || sim.status === "complete") return <Skeleton className="h-[600px]" />;
   // Once the decision is confirmed, the debrief replaces the terminal on this same page.
-  if (sim.rounds.some((r) => r.round === sim.currentRound)) return <Debrief roundId={sim.currentRound} inline />;
-  return <Terminal sim={sim} round={getRound(sim.currentRound)} key={sim.currentRound} />;
+  const result = sim.rounds.find((r) => r.round === sim.currentRound);
+  if (result && replaying === result.round) return <MarketReplay result={result} onDone={() => setReplaying(null)} />;
+  if (result) return <Debrief roundId={sim.currentRound} inline />;
+  return (
+    <>
+      <Terminal sim={sim} round={getRound(sim.currentRound)} key={sim.currentRound} onSubmitted={() => setReplaying(sim.currentRound)} />
+      {intro === sim.currentRound && <RoundIntro round={getRound(intro)} onDone={() => setIntro(null)} />}
+    </>
+  );
 }
 
 function prevClose(sim: SimState, round: Round, t: Ticker) {
@@ -48,12 +69,15 @@ function relatedLessons(round: Round) {
   return list.length ? list : [LESSON[round.lessonSlug]];
 }
 
-function Terminal({ sim, round }: { sim: SimState; round: Round }) {
+function Terminal({ sim, round, onSubmitted }: { sim: SimState; round: Round; onSubmitted: () => void }) {
   const [selected, setSelected] = useState<Ticker>(round.inNews[0] ?? COMPANIES[0].ticker);
   const [staged, setStaged] = useState<Order[]>([]);
   const [rationaleId, setRationaleId] = useState("");
   const [riskId, setRiskId] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [predictTicker, setPredictTicker] = useState<Ticker>(round.inNews[0] ?? COMPANIES[0].ticker);
+  const [guess, setGuess] = useState<number | null>(null);
+  const prediction: Prediction | undefined = guess === null ? undefined : { ticker: predictTicker, pct: guess };
   const orderRef = useRef<HTMLDivElement>(null);
 
   const preview = previewOrders(sim.ledger, staged, sim.prices);
@@ -137,6 +161,19 @@ function Terminal({ sim, round }: { sim: SimState; round: Round }) {
             setRiskId={setRiskId}
             stagedError={preview.ok ? null : preview.error}
             onReview={() => setConfirming(true)}
+            predict={
+              <PredictCard
+                sim={sim}
+                round={round}
+                ticker={predictTicker}
+                setTicker={(t) => {
+                  setPredictTicker(t);
+                  setGuess(null);
+                }}
+                guess={guess}
+                setGuess={setGuess}
+              />
+            }
           />
         </div>
       </div>
@@ -155,7 +192,17 @@ function Terminal({ sim, round }: { sim: SimState; round: Round }) {
       <p className="text-center text-xs text-muted">Simplified, fictional scenario. Prices move on a fixed script to isolate one idea; they don't predict real markets.</p>
 
       {confirming && (
-        <ConfirmDialog sim={sim} round={round} orders={staged} after={afterStaged} rationaleId={rationaleId} riskId={riskId} onCancel={() => setConfirming(false)} />
+        <ConfirmDialog
+          sim={sim}
+          round={round}
+          orders={staged}
+          after={afterStaged}
+          rationaleId={rationaleId}
+          riskId={riskId}
+          prediction={prediction}
+          onCancel={() => setConfirming(false)}
+          onSubmitted={onSubmitted}
+        />
       )}
     </div>
   );
@@ -167,7 +214,7 @@ function NewsCard({ round, sim }: { round: Round; sim: SimState }) {
   const lastValue = sim.valueHistory[sim.valueHistory.length - 1]?.value ?? 0;
   const drift = portfolioValue(sim.ledger, sim.prices) - lastValue;
   return (
-    <Card className="overflow-hidden p-0!">
+    <Card className="animate-alert overflow-hidden p-0!">
       <div className="flex items-center gap-2 border-b border-line bg-brand-soft px-5 py-2.5 text-xs font-extrabold uppercase tracking-[0.14em] text-brand-strong">
         <Icon name="news" size={15} /> Breaking · Round {round.id}
       </div>
@@ -519,6 +566,7 @@ function DecisionCard({
   setRiskId,
   stagedError,
   onReview,
+  predict,
 }: {
   sim: SimState;
   round: Round;
@@ -530,6 +578,7 @@ function DecisionCard({
   setRiskId: (v: string) => void;
   stagedError: string | null;
   onReview: () => void;
+  predict: React.ReactNode;
 }) {
   const ready = !!rationaleId && !!riskId && !stagedError;
   const after = previewOrders(sim.ledger, staged, sim.prices).ledger;
@@ -577,6 +626,7 @@ function DecisionCard({
 
       <ChoiceGroup label="Which statement best describes your reasoning?" name="rationale" options={round.rationales} value={rationaleId} onChange={setRationaleId} />
       <ChoiceGroup label="What is the most important risk to keep in mind?" name="risk" options={round.risks} value={riskId} onChange={setRiskId} />
+      {predict}
 
       <Button size="lg" className="mt-5 w-full" disabled={!ready} onClick={onReview}>
         Review & confirm decision
@@ -612,7 +662,9 @@ function ConfirmDialog({
   after,
   rationaleId,
   riskId,
+  prediction,
   onCancel,
+  onSubmitted,
 }: {
   sim: SimState;
   round: Round;
@@ -620,7 +672,9 @@ function ConfirmDialog({
   after: Ledger;
   rationaleId: string;
   riskId: string;
+  prediction?: Prediction;
   onCancel: () => void;
+  onSubmitted: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
@@ -633,7 +687,8 @@ function ConfirmDialog({
 
   const confirm = () => {
     try {
-      actions.submitDecision({ orders, rationaleId, riskId });
+      actions.submitDecision({ orders, rationaleId, riskId, prediction });
+      onSubmitted();
       window.scrollTo({ top: 0 });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -689,6 +744,12 @@ function ConfirmDialog({
             {rationale.text}
           </p>
         )}
+        {prediction && (
+          <p className="mt-2 text-sm">
+            <span className="text-muted">Your call: </span>
+            {prediction.ticker} <span className={cx("num font-bold", toneOf(prediction.pct))}>{pct(prediction.pct, { signed: true, digits: 1 })}</span>
+          </p>
+        )}
         <p className="mt-3 text-xs text-muted">Once confirmed, this round can't be changed. The scenario's next developments will then play out.</p>
         {error && <p className="mt-2 text-sm font-semibold text-down">{error}</p>}
         <div className="mt-5 flex justify-end gap-2">
@@ -701,6 +762,51 @@ function ConfirmDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+/* ---------- Prediction ---------- */
+
+function PredictCard({
+  sim,
+  round,
+  ticker,
+  setTicker,
+  guess,
+  setGuess,
+}: {
+  sim: SimState;
+  round: Round;
+  ticker: Ticker;
+  setTicker: (t: Ticker) => void;
+  guess: number | null;
+  setGuess: (v: number | null) => void;
+}) {
+  const choices = round.inNews.length ? round.inNews : [ticker];
+  const history = sim.priceHistory[ticker].slice(-8).map((p) => p.price);
+  return (
+    <fieldset className="mt-5 rounded-xl border border-dashed border-brand/50 bg-brand-soft/40 p-3">
+      <legend className="flex items-center gap-1.5 px-1 text-sm font-semibold">
+        <Icon name="target" size={15} className="text-brand" /> Make a call <span className="font-normal text-muted">(optional, not scored)</span>
+      </legend>
+      <p className="mb-2 text-xs text-muted">Where will {COMPANY[ticker].name} be once this news plays out? You'll see your guess against the real move.</p>
+      {choices.length > 1 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {choices.map((t) => (
+            <button
+              key={t}
+              type="button"
+              aria-pressed={t === ticker}
+              onClick={() => setTicker(t)}
+              className={cx("rounded-full border px-2.5 py-1 text-xs font-bold transition", t === ticker ? "border-brand bg-brand text-on-brand" : "border-line hover:border-brand/50")}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
+      <PredictChart ticker={ticker} history={history} value={guess} onChange={setGuess} />
+    </fieldset>
   );
 }
 

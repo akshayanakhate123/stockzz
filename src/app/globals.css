@@ -226,6 +226,96 @@ button:hover .lucide-arrow-right { transform: translateX(3px); }
   animation: burst 0.7s ease-out forwards;
 }
 
+
+/* Toasts and alerts drop in from below or above */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes alert-drop {
+  0% { opacity: 0; transform: translateY(-14px); }
+  60% { opacity: 1; transform: translateY(2px); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes confetti-fall {
+  0% { opacity: 1; transform: translate3d(0, -20px, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate3d(var(--dx), 340px, 0) rotate(var(--spin)); }
+}
+@keyframes ring-fill {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: var(--to, 0); }
+}
+@keyframes ping-dot {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.4); }
+  70% { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-toast { animation: toast-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.animate-alert { animation: alert-drop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.animate-pop-in { animation: pop-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.ring-fill { stroke-dasharray: 1; animation: ring-fill 1s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.confetti-piece {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  pointer-events: none;
+  animation: confetti-fall 1.6s cubic-bezier(0.25, 0.6, 0.4, 1) forwards;
+}
+.ping-dot { transform-origin: center; transform-box: fill-box; animation: ping-dot 1.4s ease-out infinite; }
+.badge-shine.shine-once::after { animation: shine 0.9s ease-out 0.35s both; }
+
+/* Round title card: the old number rolls up and out, the new one rolls in */
+@keyframes roll-out {
+  from { transform: none; opacity: 1; }
+  to { transform: translateY(-100%); opacity: 0; }
+}
+@keyframes roll-in {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.roll-out { animation: roll-out 0.6s cubic-bezier(0.6, 0, 0.2, 1) 0.2s both; }
+.roll-in { animation: roll-in 0.6s cubic-bezier(0.6, 0, 0.2, 1) 0.2s both; }
+.intro-out { animation: fade 0.25s ease-in reverse both; }
+
+/* Ticker tape: two copies of the strip slide left in a loop */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee { animation: marquee 45s linear infinite; }
+
+/* Scroll reveals: sections rise in, and their charts draw as they come into view.
+   Browsers without scroll-driven animations simply show everything. */
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(28px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: reveal-up linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 30%;
+    }
+    .reveal .draw {
+      animation: draw linear both;
+      animation-timeline: view();
+      animation-range: entry 10% cover 40%;
+    }
+    .reveal .grow-x {
+      animation: grow-x linear both;
+      animation-timeline: view();
+      animation-range: entry 10% cover 35%;
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

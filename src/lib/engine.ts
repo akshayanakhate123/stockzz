@@ -9,6 +9,7 @@ import type {
   Moves,
   Order,
   Paise,
+  Prediction,
   Prices,
   ProfileId,
   QuickAction,
@@ -294,6 +295,7 @@ export interface Decision {
   orders: Order[];
   rationaleId: string;
   riskId: string;
+  prediction?: Prediction;
 }
 
 export function resolveRound(sim: SimState, decision: Decision, now = Date.now()): SimState {
@@ -340,6 +342,7 @@ export function resolveRound(sim: SimState, decision: Decision, now = Date.now()
     valueBefore,
     valueAfter,
     checkAnswer: null,
+    ...(decision.prediction && COMPANY[decision.prediction.ticker] ? { prediction: decision.prediction } : {}),
     scores,
     completedAt: now,
   };
@@ -386,6 +389,17 @@ export function whatIf(result: RoundResult, qa: QuickAction) {
   for (const s of round.outcome) prices = applyMoves(prices, s.moves);
   const valueAfter = portfolioValue(ledger, prices);
   return { applicable, valueAfter, change: valueAfter - result.valueBefore };
+}
+
+/** How a round's guess compared with what happened. A miss of 2 points or less counts as close. */
+export function predictionResult(r: RoundResult) {
+  if (!r.prediction) return null;
+  const { ticker, pct } = r.prediction;
+  const actual = share(r.pricesAfter[ticker] - r.pricesBefore[ticker], r.pricesBefore[ticker]);
+  const miss = Math.round(Math.abs(actual - pct) * 100) / 100;
+  const flat = (n: number) => Math.abs(n) < 0.5;
+  const direction = (flat(actual) && flat(pct)) || Math.sign(actual) === Math.sign(pct);
+  return { ticker, guess: pct, actual, miss, direction, close: miss <= 2 };
 }
 
 export function investedOf(sim: SimState) {

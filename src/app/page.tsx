@@ -6,6 +6,7 @@ import { CONFIG } from "@/content/market";
 import { getRound } from "@/content/rounds";
 import { starterRemaining } from "@/content/path";
 import { WelcomeCard } from "@/components/welcome";
+import { MarketPlayground } from "@/components/playground";
 import { BADGES } from "@/lib/achievements";
 import { pct, rupees, share, toneOf } from "@/lib/format";
 import { portfolioValue, totalPnl } from "@/lib/portfolio";
@@ -72,22 +73,23 @@ export default function HomePage() {
               </LinkButton>
             </div>
           </div>
-          <ol className="grid gap-3">
-            {[
-              { n: "1", t: "Learn a concept", d: "Short lessons with sliders, labs and a quick check." },
-              { n: "2", t: "Make 10 decisions", d: "React to news: buy, sell or hold, and say why." },
-              { n: "3", t: "Review your thinking", d: "Debriefs separate good decisions from lucky ones." },
-            ].map((s) => (
-              <li key={s.n} className="flex gap-4 rounded-2xl border border-line bg-card/80 p-4">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand font-extrabold text-on-brand">{s.n}</span>
-                <div>
-                  <p className="font-bold">{s.t}</p>
-                  <p className="text-sm text-muted">{s.d}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
+          <MarketPlayground />
         </div>
+        <ol className="stagger mt-8 grid gap-3 md:grid-cols-3">
+          {[
+            { n: "1", t: "Learn a concept", d: "Short lessons with sliders, labs and a quick check." },
+            { n: "2", t: "Make 10 decisions", d: "React to news: buy, sell or hold, and say why." },
+            { n: "3", t: "Review your thinking", d: "Debriefs separate good decisions from lucky ones." },
+          ].map((s) => (
+            <li key={s.n} className="flex gap-4 rounded-2xl border border-line bg-card/80 p-4">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand font-extrabold text-on-brand">{s.n}</span>
+              <div>
+                <p className="font-bold">{s.t}</p>
+                <p className="text-sm text-muted">{s.d}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
       </section>
 
       <WelcomeCard />
@@ -127,7 +129,7 @@ export default function HomePage() {
         )}
       </section>
 
-      <section>
+      <section className="reveal">
         <div className="mb-5 flex items-end justify-between gap-4">
           <div>
             <Eyebrow>Learning path</Eyebrow>
@@ -169,7 +171,7 @@ export default function HomePage() {
         </ol>
       </section>
 
-      <section>
+      <section id="badges" className="reveal scroll-mt-24">
         <Eyebrow>Badges</Eyebrow>
         <h2 className="mt-1 text-2xl font-extrabold tracking-tight">
           {hydrated ? Object.keys(state.badges).length : 0} of {BADGES.length} earned

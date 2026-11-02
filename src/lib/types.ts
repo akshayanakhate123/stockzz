@@ -237,6 +237,12 @@ export interface RoundScores {
   comprehension: number | null;
 }
 
+/** The learner's guess, made before confirming, of how far one stock moves by the end of the round. */
+export interface Prediction {
+  ticker: Ticker;
+  pct: number;
+}
+
 export interface RoundResult {
   round: number;
   orders: Order[];
@@ -249,6 +255,7 @@ export interface RoundResult {
   valueBefore: Paise;
   valueAfter: Paise;
   checkAnswer: number | null;
+  prediction?: Prediction;
   scores: RoundScores;
   completedAt: number;
 }

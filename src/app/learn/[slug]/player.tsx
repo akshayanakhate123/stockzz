@@ -13,6 +13,7 @@ import { Icon } from "@/components/icons";
 import { Lab } from "@/components/labs";
 import { Question } from "@/components/question";
 import { Badge, Button, Callout, Card, Eyebrow, LinkButton, Progress, Skeleton } from "@/components/ui";
+import { AnimatedNumber, Confetti, Ring } from "@/components/motion";
 
 export function LessonPlayer({ slug }: { slug: string }) {
   const lesson = LESSON[slug];
@@ -529,13 +530,23 @@ function DoneStep({ lesson, state }: { lesson: Lesson; state: AppState }) {
   const next = nextLesson(lesson.slug);
   const round = lesson.applyRound;
   const ready = missingFor(round, state).length === 0 && !state.sim?.rounds.some((x) => x.round === round);
+  const done = LESSONS.filter((l) => state.lessons[l.slug]?.status === "completed").length;
   return (
-    <div className="text-center">
-      <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-up-soft text-up">
-        <Icon name="check" size={28} />
-      </div>
+    <div className="relative -m-2 overflow-hidden p-2 text-center">
+      <Confetti />
+      <Ring value={done / LESSONS.length} size={96} stroke={7} className="mx-auto text-up">
+        <span className="animate-pop-in grid size-14 place-items-center rounded-full bg-up-soft text-up" style={{ animationDelay: "0.6s" }}>
+          <Icon name="check" size={28} />
+        </span>
+      </Ring>
       <h2 className="mt-4 text-2xl font-extrabold">Lesson complete</h2>
-      <ul className="mx-auto mt-5 max-w-md space-y-2 text-left">
+      <p className="mt-1 text-sm text-muted">
+        <span className="num font-bold text-fg">
+          <AnimatedNumber value={done} countFrom={Math.max(0, done - 1)} format={String} />
+        </span>{" "}
+        of {LESSONS.length} lessons finished
+      </p>
+      <ul className="stagger mx-auto mt-5 max-w-md space-y-2 text-left">
         {lesson.recap.map((r) => (
           <li key={r} className="flex gap-2 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-medium">
             <Icon name="check" size={16} className="mt-0.5 shrink-0 text-up" />

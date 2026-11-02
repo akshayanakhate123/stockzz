@@ -78,3 +78,56 @@ export function Burst() {
     </span>
   );
 }
+
+/** Paper pieces that fall once across the parent, which needs `relative overflow-hidden`. */
+export function Confetti({ count = 36 }: { count?: number }) {
+  return (
+    <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-0">
+      {Array.from({ length: count }, (_, i) => {
+        // Spread evenly with a fixed jitter so the server and client agree.
+        const j = ((i * 37) % 17) / 17;
+        return (
+          <span
+            key={i}
+            className="confetti-piece"
+            style={{
+              left: `${((i + 0.5) / count) * 100}%`,
+              background: BURST_COLORS[i % BURST_COLORS.length],
+              animationDelay: `${Math.round(j * 380)}ms`,
+              ["--dx" as string]: `${Math.round((j - 0.5) * 120)}px`,
+              ["--spin" as string]: `${(i % 2 ? 1 : -1) * (240 + Math.round(j * 360))}deg`,
+              height: i % 3 === 0 ? 8 : 12,
+            }}
+          />
+        );
+      })}
+    </span>
+  );
+}
+
+/** Progress ring whose arc fills when it appears. */
+export function Ring({ value, size = 72, stroke = 6, className, children }: { value: number; size?: number; stroke?: number; className?: string; children?: React.ReactNode }) {
+  const r = (size - stroke) / 2;
+  return (
+    <span className={cx("relative inline-grid place-items-center", className)} style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true" className="absolute inset-0 -rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line)" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          pathLength={1}
+          className="ring-fill"
+          style={{ ["--to" as string]: 1 - Math.max(0, Math.min(1, value)) }}
+        />
+      </svg>
+      <span className="relative">{children}</span>
+    </span>
+  );
+}
+
+export { reduced as prefersReducedMotion };

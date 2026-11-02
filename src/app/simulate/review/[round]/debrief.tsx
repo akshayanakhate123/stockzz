@@ -9,7 +9,7 @@ import { getRound } from "@/content/rounds";
 import { CHECK_LESSON, STEP } from "@/content/path";
 import { GlossaryText, Term } from "@/components/glossary";
 import { ScoringExplainer } from "@/components/scoring-explainer";
-import { charge, previewOrders, whatIf } from "@/lib/engine";
+import { charge, predictionResult, previewOrders, whatIf } from "@/lib/engine";
 import { cx, pct, rupees, share, toneOf } from "@/lib/format";
 import { unrealized } from "@/lib/portfolio";
 import { actions, useApp } from "@/lib/store";
@@ -19,6 +19,7 @@ import { Question } from "@/components/question";
 import { RoundProgress } from "@/components/sim-ui";
 import { Badge, Button, Card, LinkButton, Skeleton } from "@/components/ui";
 import { AnimatedNumber } from "@/components/motion";
+import { WhatIfChart } from "@/components/what-if";
 
 type Tone = "up" | "brand" | "down" | "neutral";
 
@@ -90,6 +91,7 @@ export function Debrief({ roundId, inline = false }: { roundId: number; inline?:
   const lessons = LESSONS.filter((l) => l.applyRound === roundId);
   const conceptLessons = lessons.length ? lessons : [LESSON[round.lessonSlug]];
   const checkLesson = LESSON[CHECK_LESSON[roundId] ?? round.lessonSlug];
+  const call = predictionResult(result);
 
   const next = () => {
     actions.nextRound();
@@ -150,6 +152,15 @@ export function Debrief({ roundId, inline = false }: { roundId: number; inline?:
           </span>{" "}
           <Badge tone="brand">{path.label}</Badge>
         </p>
+        {call && (
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted">Your call on {call.ticker}:</span>
+            <span className={cx("num font-bold", toneOf(call.guess))}>{pct(call.guess, { signed: true, digits: 1 })}</span>
+            <span className="text-muted">vs actual</span>
+            <span className={cx("num font-bold", toneOf(call.actual))}>{pct(call.actual, { signed: true, digits: 1 })}</span>
+            <Badge tone={call.close ? "up" : call.direction ? "brand" : "down"}>{call.close ? "Spot on" : call.direction ? "Right direction" : "Wrong way"}</Badge>
+          </p>
+        )}
       </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
@@ -251,7 +262,7 @@ export function Debrief({ roundId, inline = false }: { roundId: number; inline?:
         </Card>
       </div>
 
-      <Card>
+      <Card className="reveal">
         <h2 className="text-lg font-extrabold">How to judge this round</h2>
         <p className="mt-1 text-sm text-muted">A good decision can lose money and a poor one can make money. These four questions are assessed separately.</p>
         <div className="mt-3">
@@ -293,7 +304,7 @@ export function Debrief({ roundId, inline = false }: { roundId: number; inline?:
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="reveal grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <h2 className="text-lg font-extrabold">The concept</h2>
           <div className="mt-3 flex flex-wrap gap-1.5">
@@ -334,11 +345,14 @@ export function Debrief({ roundId, inline = false }: { roundId: number; inline?:
         </Card>
       </div>
 
-      <Card>
+      <Card className="reveal">
         <h2 className="text-lg font-extrabold">Alternative decisions</h2>
         <p className="mt-1 text-sm text-muted">
           Replayed from your exact starting position with the same prices. This uses hindsight you didn't have. Compare the trade-offs, not just the numbers.
         </p>
+        <div className="mt-4">
+          <WhatIfChart result={result} path={path} />
+        </div>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[520px] text-sm">
             <thead>

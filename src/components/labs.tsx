@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { LabId } from "@/lib/types";
 import { cx } from "@/lib/format";
 import { Button } from "./ui";
@@ -456,6 +456,176 @@ function DiversifyLab() {
 /* ---------- 9. Drawdown ---------- */
 
 function DrawdownLab() {
+  const [tab, setTab] = useState<"maths" | "panic">("panic");
+  return (
+    <div className="space-y-5">
+      <Segmented
+        label="Drawdown lab"
+        value={tab}
+        onChange={setTab}
+        options={[
+          { id: "panic", label: "Panic test" },
+          { id: "maths", label: "Recovery maths" },
+        ]}
+      />
+      {tab === "panic" ? <PanicTest /> : <RecoveryMaths />}
+    </div>
+  );
+}
+
+// A scripted crash and recovery: [tick, % from the start]. Fictional, and it ends higher on purpose.
+const CRASH: [number, number][] = [
+  [0, 0],
+  [20, 4],
+  [35, -6],
+  [48, -18],
+  [62, -29],
+  [72, -33],
+  [84, -26],
+  [94, -31],
+  [110, -18],
+  [128, -6],
+  [150, 6],
+];
+const CRASH_TICKS = 150;
+const CRASH_MS = 90;
+const HEADLINES: [number, string][] = [
+  [0, "Markets steady, investors upbeat"],
+  [24, "Global sell-off spreads to Indian shares"],
+  [48, "Experts warn the worst may be ahead"],
+  [72, "Investors pull money out at a record pace"],
+  [100, "Bargain hunters return quietly"],
+  [130, "Index wins back its losses"],
+];
+
+const CRASH_PATH = (() => {
+  let a = 11;
+  const r = () => ((a = (a * 16807) % 2147483647) / 2147483647) - 0.5;
+  const out: number[] = [];
+  let k = 0;
+  let wobble = 0;
+  for (let i = 0; i <= CRASH_TICKS; i++) {
+    while (CRASH[k + 1][0] < i) k++;
+    const [i0, v0] = CRASH[k];
+    const [i1, v1] = CRASH[k + 1];
+    wobble = wobble * 0.6 + r() * 2.2;
+    const edge = Math.min(i, CRASH_TICKS - i) < 4 ? 0 : 1;
+    out.push(v0 + ((v1 - v0) * (i - i0)) / (i1 - i0) + wobble * edge);
+  }
+  return out;
+})();
+
+function PanicTest() {
+  const [i, setI] = useState(0);
+  const [running, setRunning] = useState(false);
+  const [soldAt, setSoldAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setI((n) => Math.min(CRASH_TICKS, n + 1)), CRASH_MS);
+    return () => clearInterval(id);
+  }, [running]);
+
+  const done = i >= CRASH_TICKS;
+  if (done && running) setRunning(false);
+  const money = (k: number) => 100000 * (1 + CRASH_PATH[k] / 100);
+  const yours = soldAt === null ? money(i) : money(soldAt);
+  const peak = Math.max(...CRASH_PATH.slice(0, (soldAt ?? i) + 1));
+  const fromPeak = ((1 + CRASH_PATH[soldAt ?? i] / 100) / (1 + peak / 100) - 1) * 100;
+  const headline = [...HEADLINES].reverse().find(([at]) => i >= at)![1];
+  const scary = !done && soldAt === null && CRASH_PATH[i] < -20;
+
+  const W = 420;
+  const H = 170;
+  const lo = Math.min(...CRASH_PATH) - 4;
+  const hi = Math.max(...CRASH_PATH) + 4;
+  const x = (k: number) => 6 + (k / CRASH_TICKS) * (W - 12);
+  const y = (v: number) => 8 + (1 - (v - lo) / (hi - lo)) * (H - 16);
+  const line = (from: number, to: number) =>
+    CRASH_PATH.slice(from, to + 1)
+      .map((v, k) => `${k ? "L" : "M"}${x(from + k).toFixed(1)},${y(v).toFixed(1)}`)
+      .join(" ");
+
+  const reset = () => {
+    setI(0);
+    setSoldAt(null);
+    setRunning(true);
+  };
+
+  return (
+    <Grid>
+      <Col>
+        <p className="text-sm text-muted">
+          You have ₹1,00,000 in a broad market fund. Press start and watch. You can sell at any moment, or hold. There's no right answer to look up.
+        </p>
+        <div className="rounded-xl border border-line bg-surface p-3">
+          <p key={headline} className="animate-alert flex items-center gap-2 text-sm font-bold" aria-live="polite">
+            <Icon name="news" size={15} className={CRASH_PATH[i] < -10 ? "text-down" : "text-brand"} /> {headline}
+          </p>
+          <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 w-full" aria-hidden="true">
+            <line x1={0} x2={W} y1={y(0)} y2={y(0)} stroke="var(--line-strong)" strokeDasharray="3 4" />
+            {soldAt === null ? (
+              <path d={line(0, i)} fill="none" stroke={CRASH_PATH[i] >= 0 ? "var(--up)" : "var(--down)"} strokeWidth={2.2} strokeLinejoin="round" />
+            ) : (
+              <>
+                <path d={line(0, soldAt)} fill="none" stroke="var(--down)" strokeWidth={2.2} strokeLinejoin="round" />
+                <path d={line(soldAt, i)} fill="none" stroke="var(--muted)" strokeOpacity={0.6} strokeWidth={1.6} strokeDasharray="4 4" />
+                <line x1={x(soldAt)} x2={x(soldAt)} y1={4} y2={H - 4} stroke="var(--brand)" strokeDasharray="2 3" />
+                <circle cx={x(soldAt)} cy={y(CRASH_PATH[soldAt])} r={5} fill="var(--brand)" />
+                <text x={Math.min(x(soldAt) + 6, W - 60)} y={16} fontSize={11} fontWeight={800} fill="var(--brand)">
+                  you sold
+                </text>
+              </>
+            )}
+            {!done && <circle cx={x(i)} cy={y(CRASH_PATH[i])} r={3.5} fill="var(--fg)" />}
+          </svg>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {!running && !done && i === 0 && (
+            <Button onClick={() => setRunning(true)}>
+              <Icon name="play" size={15} /> Start the market
+            </Button>
+          )}
+          {running && soldAt === null && (
+            <Button variant="sell" size="lg" className={cx("flex-1", scary && "animate-pulse")} onClick={() => setSoldAt(i)}>
+              Sell everything
+            </Button>
+          )}
+          {(done || (soldAt !== null && !running)) && (
+            <Button variant="outline" onClick={reset}>
+              <Icon name="refresh" size={15} /> Try again
+            </Button>
+          )}
+        </div>
+      </Col>
+      <Col>
+        <Out>
+          <Readout label={soldAt === null ? "Your money" : "You sold for"} value={inr(yours)} className={tone(yours - 100000)} />
+          <Readout label="From the peak" value={sgn(fromPeak)} className={tone(fromPeak)} />
+          {soldAt !== null && <Readout label="If you'd held" value={inr(money(i))} className={tone(money(i) - 100000)} hint={done ? "At the end" : "Right now"} />}
+          {soldAt !== null && <Readout label="Cost of selling" value={inr(money(i) - yours)} className={tone(yours - money(i))} />}
+        </Out>
+        {done && (
+          <div className="animate-pop-in rounded-xl border border-brand/40 bg-brand-soft/60 p-4 text-sm">
+            <p className="font-bold">
+              {soldAt === null
+                ? "You held through a fall of over 30%, and came out ahead."
+                : CRASH_PATH[soldAt] < -20
+                  ? "You sold near the bottom and locked in the loss."
+                  : "You sold early in the fall."}
+            </p>
+            <p className="mt-1 text-muted">
+              Selling turns a paper loss into a real one, and you then have to decide when to buy back. This script recovers on purpose; real markets can fall further
+              or take years to recover. The point is to plan your position size so that a fall like this doesn't force your hand.
+            </p>
+          </div>
+        )}
+      </Col>
+    </Grid>
+  );
+}
+
+function RecoveryMaths() {
   const [fall, setFall] = useState(35);
   const f = fall / 100;
   const need = (f / (1 - f)) * 100;

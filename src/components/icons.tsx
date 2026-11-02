@@ -12,12 +12,15 @@ import {
   Circle,
   Clock,
   Flag,
+  Gauge,
   GraduationCap,
   House,
   Info,
+  Landmark,
   Lock,
   Mail,
   Monitor,
+  MoveVertical,
   Moon,
   Newspaper,
   Pause,
@@ -26,6 +29,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Shapes,
+  SkipForward,
   Sparkles,
   Sun,
   Target,
@@ -35,6 +39,7 @@ import {
   Trophy,
   Wind,
   X,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -75,6 +80,11 @@ const ICONS = {
   calm: Wind,
   award: Award,
   pause: Pause,
+  zap: Zap,
+  gauge: Gauge,
+  skip: SkipForward,
+  landmark: Landmark,
+  drag: MoveVertical,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
