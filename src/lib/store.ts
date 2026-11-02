@@ -1,6 +1,8 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { LESSON } from "@/content/lessons";
+import { STEP } from "@/content/path";
 import { BADGES } from "./achievements";
 import { advance, answerCheck, resolveRound, startSim, type Decision } from "./engine";
 import type { AppState, EventName, ProfileId } from "./types";
@@ -12,12 +14,27 @@ export function emptyState(): AppState {
   return { version: 1, lessons: {}, sim: null, badges: {}, events: [] };
 }
 
+/**
+ * Lessons used to complete only on the final "Done" step, so learners who left from "Apply it"
+ * were stuck as in progress. Anyone who answered the quiz and reached "Apply it" has finished.
+ */
+function healLessons(s: AppState): AppState {
+  let lessons = s.lessons;
+  for (const [slug, l] of Object.entries(s.lessons)) {
+    const lesson = LESSON[slug];
+    if (!lesson || l.status === "completed" || l.step < STEP.apply) continue;
+    if (!lesson.quiz.every((q) => l.quiz[q.id])) continue;
+    lessons = { ...lessons, [slug]: { ...l, status: "completed", completedAt: l.completedAt ?? Date.now() } };
+  }
+  return lessons === s.lessons ? s : { ...s, lessons };
+}
+
 function parse(raw: string | null): AppState | null {
   if (!raw) return null;
   try {
     const s = JSON.parse(raw);
     if (!s || typeof s !== "object" || s.version !== 1 || typeof s.lessons !== "object" || !Array.isArray(s.events)) return null;
-    return { ...emptyState(), ...s };
+    return healLessons({ ...emptyState(), ...s });
   } catch {
     return null;
   }

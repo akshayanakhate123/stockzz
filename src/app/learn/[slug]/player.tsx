@@ -43,7 +43,9 @@ export function LessonPlayer({ slug }: { slug: string }) {
     const s = Math.max(0, Math.min(LESSON_STEPS.length - 1, n));
     setStep(s);
     actions.setLessonStep(slug, s);
-    if (s === LESSON_STEPS.length - 1) actions.completeLesson(slug);
+    // Passing the quiz and reaching "Apply it" finishes the lesson. The Apply step can send the
+    // learner straight to another lesson, so waiting for "Done" would leave this one unfinished.
+    if (s >= STEP.apply) actions.completeLesson(slug);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -482,7 +484,7 @@ function ExampleStep({ lesson }: { lesson: Lesson }) {
 
 function ApplyStep({ lesson, state }: { lesson: Lesson; state: AppState }) {
   const r = getRound(lesson.applyRound);
-  // This lesson is about to be completed, so don't count it as missing.
+  // Reaching this step completes the lesson; filter it anyway so the first render can't list it.
   const others = missingFor(r.id, state).filter((l) => l.slug !== lesson.slug);
   const played = state.sim?.rounds.some((x) => x.round === r.id);
   return (
